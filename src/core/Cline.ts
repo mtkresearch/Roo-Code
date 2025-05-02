@@ -1769,6 +1769,7 @@ export class Cline extends EventEmitter<ClineEvents> {
 			const stream = this.attemptApiRequest(previousApiReqIndex)
 			let assistantMessage = ""
 			let reasoningMessage = ""
+			let accumulatedText = ""
 			this.isStreaming = true
 
 			try {
@@ -1783,8 +1784,9 @@ export class Cline extends EventEmitter<ClineEvents> {
 							reasoningMessage += chunk.text
 							await this.say("reasoning", reasoningMessage, undefined, true)
 							if (vscode.workspace.getConfiguration("roo.debug").get("logApiStreamText")) {
-								console.log("API Stream Reasoning:", chunk.text)
+								console.log("API Stream (Reasoning):", chunk.text)
 							}
+							accumulatedText += chunk.text
 							break
 						case "usage":
 							inputTokens += chunk.inputTokens
@@ -1804,8 +1806,9 @@ export class Cline extends EventEmitter<ClineEvents> {
 							// present content to user
 							this.presentAssistantMessage()
 							if (vscode.workspace.getConfiguration("roo.debug").get("logApiStreamText")) {
-								console.log("API Stream Text:", chunk.text)
+								console.log("API Stream (Text):", chunk.text)
 							}
+							accumulatedText += chunk.text
 							break
 					}
 
@@ -1834,6 +1837,9 @@ export class Cline extends EventEmitter<ClineEvents> {
 							"\n\n[Response interrupted by a tool use result. Only one tool may be used at a time and should be placed at the end of the message.]"
 						break
 					}
+				}
+				if (vscode.workspace.getConfiguration("roo.debug").get("logFullApiResponse")) {
+					console.log("Full API Response:", accumulatedText)
 				}
 			} catch (error) {
 				// abandoned happens when extension is no longer waiting for the cline instance to finish aborting (error is thrown here when any function in the for loop throws due to this.abort)

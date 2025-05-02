@@ -334,6 +334,11 @@
 					"type": "boolean",
 					"default": false,
 					"description": "Log the text content of 'text' and 'reasoning' chunks from the API stream to the debug console."
+				},
+				"roo.debug.logFullApiResponse": {
+					"type": "boolean",
+					"default": false,
+					"description": "Log the full accumulated text content from the API stream to the debug console after the stream ends."
 				}
 			}
 		}
