@@ -75,6 +75,7 @@
 				{
 					"type": "webview",
 					"id": "roo-cline.SidebarProvider",
+					"icon": "assets/icons/icon.svg",
 					"name": ""
 				}
 			]
@@ -328,6 +329,11 @@
 					"type": "string",
 					"default": "",
 					"description": "%settings.customStoragePath.description%"
+				},
+				"roo.debug.logApiStreamText": {
+					"type": "boolean",
+					"default": false,
+					"description": "Log the text content of 'text' and 'reasoning' chunks from the API stream to the debug console."
 				}
 			}
 		}

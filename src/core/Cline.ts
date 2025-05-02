@@ -1782,6 +1782,9 @@ export class Cline extends EventEmitter<ClineEvents> {
 						case "reasoning":
 							reasoningMessage += chunk.text
 							await this.say("reasoning", reasoningMessage, undefined, true)
+							if (vscode.workspace.getConfiguration("roo.debug").get("logApiStreamText")) {
+								console.log("API Stream Reasoning:", chunk.text)
+							}
 							break
 						case "usage":
 							inputTokens += chunk.inputTokens
@@ -1800,6 +1803,9 @@ export class Cline extends EventEmitter<ClineEvents> {
 							}
 							// present content to user
 							this.presentAssistantMessage()
+							if (vscode.workspace.getConfiguration("roo.debug").get("logApiStreamText")) {
+								console.log("API Stream Text:", chunk.text)
+							}
 							break
 					}
 
