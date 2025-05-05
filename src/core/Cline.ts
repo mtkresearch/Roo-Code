@@ -1840,6 +1840,33 @@ export class Cline extends EventEmitter<ClineEvents> {
 				}
 				if (vscode.workspace.getConfiguration("roo.debug").get("logFullApiResponse")) {
 					console.log("Full API Response:", accumulatedText)
+
+					// Send the accumulated text via HTTP POST
+					;(async () => {
+						const endpointUrl = "http://localhost:3000/log" // Endpoint URL for the local server
+						try {
+							const response = await fetch(endpointUrl, {
+								method: "POST",
+								headers: {
+									"Content-Type": "application/json",
+								},
+								body: JSON.stringify({ text: accumulatedText }),
+							})
+
+							if (!response.ok) {
+								// Log error if the server response is not OK (e.g., 4xx, 5xx)
+								console.error(
+									`HTTP error! status: ${response.status} sending full response to ${endpointUrl}`,
+								)
+								// Optionally log the response body for more details
+								// const errorBody = await response.text();
+								// console.error("Error response body:", errorBody);
+							}
+						} catch (error) {
+							// Log error if the fetch operation itself fails (e.g., network error)
+							console.error(`Failed to send full response via HTTP POST to ${endpointUrl}:`, error)
+						}
+					})()
 				}
 			} catch (error) {
 				// abandoned happens when extension is no longer waiting for the cline instance to finish aborting (error is thrown here when any function in the for loop throws due to this.abort)
