@@ -25,7 +25,13 @@ import { TerminalRegistry } from "./integrations/terminal/TerminalRegistry"
 import { API } from "./exports/api"
 import { migrateSettings } from "./utils/migrateSettings"
 
-import { handleUri, registerCommands, registerCodeActions, registerTerminalActions } from "./activate"
+import {
+	handleUri,
+	registerCommands,
+	registerCodeActions,
+	registerTerminalActions,
+	registerHttpServer,
+} from "./activate"
 import { formatLanguage } from "./shared/language"
 
 /**
@@ -116,6 +122,9 @@ export async function activate(context: vscode.ExtensionContext) {
 
 	registerCodeActions(context)
 	registerTerminalActions(context)
+
+	// 註冊 HTTP 伺服器
+	registerHttpServer(context)
 
 	// Allows other extensions to activate once Roo is ready.
 	vscode.commands.executeCommand("roo-cline.activationCompleted")
