@@ -463,6 +463,7 @@ export class ClineProvider extends EventEmitter<ClineProviderEvents> implements 
 				| "experiments"
 			>
 		> = {},
+		requestId?: string, // Added requestId parameter
 	) {
 		const {
 			apiConfiguration,
@@ -492,6 +493,7 @@ export class ClineProvider extends EventEmitter<ClineProviderEvents> implements 
 			parentTask,
 			taskNumber: this.clineStack.length + 1,
 			onCreated: (cline) => this.emit("clineCreated", cline),
+			requestId, // Pass requestId to Cline constructor
 			...options,
 		})
 

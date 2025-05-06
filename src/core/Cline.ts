@@ -38,6 +38,7 @@ import { EXPERIMENT_IDS, experiments as Experiments, ExperimentId } from "../sha
 import { formatLanguage } from "../shared/language"
 import { ToolParamName, ToolResponse, DiffStrategy } from "../shared/tools"
 
+import { resolvePromptRequest } from "../integrations/httpInput/simpleHttpServer" // Added import
 // services
 import { UrlContentFetcher } from "../services/browser/UrlContentFetcher"
 import { listFiles } from "../services/glob/list-files"
@@ -196,6 +197,9 @@ export class Cline extends EventEmitter<ClineEvents> {
 	private didAlreadyUseTool = false
 	private didCompleteReadingStream = false
 
+	// http request tracking
+	private _httpRequestId?: string // Added for tracking HTTP requests
+
 	// metrics
 	private toolUsage: ToolUsage = {}
 
@@ -218,7 +222,9 @@ export class Cline extends EventEmitter<ClineEvents> {
 		parentTask,
 		taskNumber = -1,
 		onCreated,
-	}: ClineOptions) {
+		requestId, // Added requestId
+	}: ClineOptions & { requestId?: string }) {
+		// Added requestId to options type
 		super()
 
 		if (startTask && !task && !images && !historyItem) {
@@ -258,6 +264,7 @@ export class Cline extends EventEmitter<ClineEvents> {
 		this.rootTask = rootTask
 		this.parentTask = parentTask
 		this.taskNumber = taskNumber
+		this._httpRequestId = requestId // Assign requestId
 
 		if (historyItem) {
 			telemetryService.captureTaskRestarted(this.taskId)
@@ -483,10 +490,20 @@ export class Cline extends EventEmitter<ClineEvents> {
 		return result
 	}
 
-	async handleWebviewAskResponse(askResponse: ClineAskResponse, text?: string, images?: string[]) {
+	async handleWebviewAskResponse(
+		askResponse: ClineAskResponse,
+		text?: string,
+		images?: string[],
+		requestId?: string,
+	) {
+		// Added requestId
 		this.askResponse = askResponse
 		this.askResponseText = text
 		this.askResponseImages = images
+		// If a request ID is provided (likely from an HTTP request), store it.
+		if (requestId) {
+			this._httpRequestId = requestId
+		}
 	}
 
 	async handleTerminalOperation(terminalOperation: "continue" | "abort") {
@@ -1747,6 +1764,16 @@ export class Cline extends EventEmitter<ClineEvents> {
 				updateApiReqMsg(cancelReason, streamingFailedMessage)
 				await this.saveClineMessages()
 
+				// If this task was triggered by an HTTP request, resolve it with an error
+				if (this._httpRequestId) {
+					const errorReason =
+						cancelReason === "streaming_failed"
+							? (streamingFailedMessage ?? "Streaming failed")
+							: "User cancelled"
+					resolvePromptRequest(this._httpRequestId, false, { reason: cancelReason, message: errorReason })
+					this._httpRequestId = undefined // Clear the ID after resolving
+				}
+
 				// signals to provider that it can retrieve the saved messages from disk, as abortTask can not be awaited on in nature
 				this.didFinishAbortingStream = true
 			}
@@ -1910,6 +1937,13 @@ export class Cline extends EventEmitter<ClineEvents> {
 			updateApiReqMsg()
 			await this.saveClineMessages()
 			await this.providerRef.deref()?.postStateToWebview()
+
+			// If this task was triggered by an HTTP request, resolve it with the accumulated text
+			if (this._httpRequestId) {
+				// Ensure accumulatedText is accessible here. It was defined earlier in the try block.
+				resolvePromptRequest(this._httpRequestId, true, accumulatedText)
+				this._httpRequestId = undefined // Clear the ID after resolving
+			}
 
 			// now add to apiconversationhistory
 			// need to save assistant responses to file before proceeding to tool use since user can exit at any moment and we wouldn't be able to save the assistant's response
