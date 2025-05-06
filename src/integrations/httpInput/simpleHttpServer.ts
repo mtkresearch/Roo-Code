@@ -23,6 +23,7 @@ export function startServer(port: number = 30005): Promise<void> {
 		app.post("/prompt", async (req: Request, res: Response) => {
 			try {
 				const prompt = req.body.prompt
+				const continueConversation = req.body.continueConversation === true
 
 				if (!prompt || typeof prompt !== "string") {
 					res.status(400).send('Bad Request: "prompt" field is required and must be a string.')
@@ -32,9 +33,15 @@ export function startServer(port: number = 30005): Promise<void> {
 				const clineProvider = await ClineProvider.getInstance()
 
 				if (clineProvider) {
-					// 使用公共方法來發送消息到 Webview
-					await clineProvider.initClineWithTask(prompt)
-					res.status(200).send("Prompt sent to Roo.")
+					if (continueConversation && clineProvider.getCurrentCline()) {
+						// 將 prompt 添加到現有對話
+						clineProvider.getCurrentCline()?.handleWebviewAskResponse("messageResponse", prompt, [])
+						res.status(200).send("Prompt added to current conversation.")
+					} else {
+						// 開啟新任務
+						await clineProvider.initClineWithTask(prompt)
+						res.status(200).send("Prompt sent as new task to Roo.")
+					}
 				} else {
 					res.status(404).send("Active Roo instance not found.")
 				}
