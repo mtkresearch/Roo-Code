@@ -2,7 +2,7 @@
 
 ## 1. 功能目標
 
-快速驗證透過 HTTP POST 請求將 prompt 字串發送到 Roo 擴充功能並觸發新任務的可行性。
+快速驗證透過 HTTP POST 請求將 prompt 字串發送到 Roo 擴充功能並觸發新任務或繼續現有對話的可行性。
 
 ## 2. 規劃步驟
 
@@ -16,19 +16,21 @@
 
 - **中介軟體：** 使用 `express.json()` 解析 JSON 請求 Body。
 - **路由：** 建立 `POST /prompt` 的路由處理函式。
-- **請求 Body 格式：** 預期為 `{"prompt": "用戶的 prompt 字串"}`。
-- **解析：** 從 `req.body.prompt` 獲取 prompt 字串。
+- **請求 Body 格式：** 預期為 `{"prompt": "用戶的 prompt 字串", "continueConversation": true/false}`。
+- **解析：** 從 `req.body.prompt` 獲取 prompt 字串，並從 `req.body.continueConversation` 獲取是否繼續現有對話的標誌。
 
 ### 2.3. 與 Roo 擴充功能互動
 
 - **引入：** 在 POST 處理函式中 `import { ClineProvider } from '../../core/webview/ClineProvider';`。
 - **獲取實例：** 呼叫 `const clineProvider = await ClineProvider.getInstance();`。
 - **檢查與發送：**
-    - 如果 `clineProvider?.view` 存在：
-        - 構造消息 `const message = { type: "newTask", text: req.body.prompt };`
-        - 呼叫 `clineProvider.view.webview.postMessage(message);`
+    - 如果 `clineProvider` 存在：
+        - 如果 `req.body.continueConversation` 為 `true` 且當前有活動的對話：
+            - 調用 `clineProvider.getCurrentCline()?.handleWebviewAskResponse(true, req.body.prompt, [])` 方法，將 prompt 添加到現有對話。
+        - 否則：
+            - 調用 `clineProvider.initClineWithTask(req.body.prompt)` 方法，開啟新任務。
         - 回傳 HTTP 200 OK (`res.status(200).send('Prompt sent.');`)。
-    - 如果 `clineProvider?.view` 不存在：
+    - 如果 `clineProvider` 不存在：
         - 回傳 HTTP 404 Not Found (`res.status(404).send('Active Roo instance not found.');`)。
 - **基本錯誤處理：** 如果 `req.body.prompt` 不存在或不是字串，回傳 HTTP 400 Bad Request。
 
@@ -43,18 +45,20 @@
 
 ```mermaid
 graph TD
-    A[curl POST /prompt '{"prompt":"..."}'] --> B{Express Server (in Extension)};
+    A[curl POST /prompt '{"prompt":"...", "continueConversation": true/false}'] --> B{Express Server (in Extension)};
     subgraph "Roo 擴充功能"
-        B -- 解析 Body --> C[prompt 字串];
+        B -- 解析 Body --> C[prompt 字串 & continueConversation 標誌];
         B -- 呼叫 --> D[ClineProvider.getInstance()];
         D -- 返回 Provider 實例或 undefined --> B;
         E[ClineProvider];
         F[Roo Webview];
     end
     alt 找到 Provider 實例
-        B -- 構造 newTask 消息 --> B;
-        B -- postMessage --> F;
-        F -- (內部處理) --> E;
+        B -- 檢查 continueConversation --> G{continueConversation?};
+        G -- 是 --> H[handleWebviewAskResponse];
+        G -- 否 --> I[initClineWithTask];
+        H --> B;
+        I --> B;
         B -- HTTP 200 OK --> A;
     else 未找到 Provider 實例
         B -- HTTP 404 Not Found --> A;
@@ -68,4 +72,5 @@ graph TD
 
 - 此為實驗性功能，未包含設定、進階錯誤處理或安全機制。
 - 埠號 30005 為硬編碼。
-- 僅支援純文字 prompt，未處理圖片。
+- 支援將 prompt 添加到現有對話或開啟新任務，透過 `continueConversation` 參數控制。
+- 目前僅支援純文字 prompt，未處理圖片。
