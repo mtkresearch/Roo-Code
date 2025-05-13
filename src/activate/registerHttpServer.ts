@@ -3,13 +3,19 @@ import { startServer, stopServer } from "../integrations/httpInput/simpleHttpSer
 
 export function registerHttpServer(context: vscode.ExtensionContext) {
 	// 啟動 HTTP 伺服器
-	startServer(30005)
-		.then(() => {
-			console.log("HTTP server started successfully")
+	const server = startServer(30005)
+
+	if (server) {
+		server.on("listening", () => {
+			console.log("HTTP server started successfully on port 30005")
 		})
-		.catch((err) => {
+		server.on("error", (err: Error) => {
+			// 為 err 加上型別
 			console.error("Failed to start HTTP server:", err)
 		})
+	} else {
+		console.error("Failed to initialize HTTP server instance.")
+	}
 
 	// 在擴充功能停用時停止伺服器
 	context.subscriptions.push({
@@ -18,7 +24,8 @@ export function registerHttpServer(context: vscode.ExtensionContext) {
 				.then(() => {
 					console.log("HTTP server stopped successfully")
 				})
-				.catch((err) => {
+				.catch((err: Error) => {
+					// 為 err 加上型別
 					console.error("Failed to stop HTTP server:", err)
 				})
 		},
