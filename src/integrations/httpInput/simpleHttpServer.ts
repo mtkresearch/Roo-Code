@@ -13,25 +13,28 @@ const RESPONSE_TIMEOUT = 180000 // 設定超時時間，增加到 180 秒 (3 分
 app.use(express.json())
 
 // 新增：用於從 Roo 核心接收 LLM 回應並完成 HTTP 請求的函數
-export function resolvePromptRequest(requestId: string, success: boolean, data: string | object) {
+export function resolvePromptRequest(requestId: string, success: boolean, data: any, isFinalResponse: boolean) {
 	if (pendingResponses.has(requestId)) {
-		const { res, timeoutId } = pendingResponses.get(requestId)!
-		clearTimeout(timeoutId) // 清除超時定時器
+		const entry = pendingResponses.get(requestId)!
+		const { res, timeoutId } = entry
 
-		if (!res.headersSent) {
-			// 檢查是否已發送回應 (例如超時)
-			if (success) {
-				res.status(200).json({ response: data }) // 成功，回傳 LLM 回應
+		if (isFinalResponse) {
+			clearTimeout(timeoutId) // 清除超時定時器
+
+			if (!res.headersSent) {
+				if (success) {
+					res.status(200).json({ response: data }) // 成功，回傳最終的 LLM 回應
+				} else {
+					res.status(500).json({ error: "Error processing prompt in Roo", details: data })
+				}
 			} else {
-				// 處理 Roo 核心回報的錯誤
-				res.status(500).json({ error: "Error processing prompt in Roo", details: data })
+				console.warn(`Headers already sent for request ID ${requestId}, likely due to timeout.`)
 			}
+			pendingResponses.delete(requestId) // 從 Map 中移除
 		} else {
-			console.warn(`Headers already sent for request ID ${requestId}, likely due to timeout.`)
+			console.log(`Request ID ${requestId}: Intermediate data received, not sending HTTP response yet.`)
 		}
-		pendingResponses.delete(requestId) // 從 Map 中移除
 	} else {
-		// 可能已經超時或 requestId 無效
 		console.warn(
 			`Request ID ${requestId} not found in pending responses, maybe it timed out or was already resolved.`,
 		)

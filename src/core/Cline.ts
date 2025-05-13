@@ -198,7 +198,8 @@ export class Cline extends EventEmitter<ClineEvents> {
 	private didCompleteReadingStream = false
 
 	// http request tracking
-	private _httpRequestId?: string // Added for tracking HTTP requests
+	public _httpRequestId?: string // Added for tracking HTTP requests
+	public _httpAccumulatedResponse: string = "" // 用於累積 HTTP 回應內容
 
 	// metrics
 	private toolUsage: ToolUsage = {}
@@ -265,6 +266,7 @@ export class Cline extends EventEmitter<ClineEvents> {
 		this.parentTask = parentTask
 		this.taskNumber = taskNumber
 		this._httpRequestId = requestId // Assign requestId
+		this._httpAccumulatedResponse = "" // 確保初始化
 
 		if (historyItem) {
 			telemetryService.captureTaskRestarted(this.taskId)
@@ -503,6 +505,7 @@ export class Cline extends EventEmitter<ClineEvents> {
 		// If a request ID is provided (likely from an HTTP request), store it.
 		if (requestId) {
 			this._httpRequestId = requestId
+			this._httpAccumulatedResponse = "" // 如果是新對話/請求，重置累積器
 		}
 	}
 
@@ -1770,8 +1773,15 @@ export class Cline extends EventEmitter<ClineEvents> {
 						cancelReason === "streaming_failed"
 							? (streamingFailedMessage ?? "Streaming failed")
 							: "User cancelled"
-					resolvePromptRequest(this._httpRequestId, false, { reason: cancelReason, message: errorReason })
-					this._httpRequestId = undefined // Clear the ID after resolving
+					// Indicate this is the final response
+					resolvePromptRequest(
+						this._httpRequestId,
+						false,
+						{ reason: cancelReason, message: errorReason },
+						true,
+					)
+					this._httpRequestId = undefined // Clear the ID
+					this._httpAccumulatedResponse = "" // Clear accumulated data
 				}
 
 				// signals to provider that it can retrieve the saved messages from disk, as abortTask can not be awaited on in nature
@@ -1836,6 +1846,9 @@ export class Cline extends EventEmitter<ClineEvents> {
 								console.log("API Stream (Text):", chunk.text)
 							}
 							accumulatedText += chunk.text
+							if (this._httpRequestId) {
+								this._httpAccumulatedResponse += chunk.text
+							}
 							break
 					}
 
@@ -1938,11 +1951,12 @@ export class Cline extends EventEmitter<ClineEvents> {
 			await this.saveClineMessages()
 			await this.providerRef.deref()?.postStateToWebview()
 
-			// If this task was triggered by an HTTP request, resolve it with the accumulated text
+			// If this task was triggered by an HTTP request, notify but do not resolve yet
 			if (this._httpRequestId) {
-				// Ensure accumulatedText is accessible here. It was defined earlier in the try block.
-				resolvePromptRequest(this._httpRequestId, true, accumulatedText)
-				this._httpRequestId = undefined // Clear the ID after resolving
+				// Call resolvePromptRequest with isFinalResponse set to false
+				// Data parameter can be null as it won't be sent immediately
+				resolvePromptRequest(this._httpRequestId, true, null, false)
+				// Important: Do not clear this._httpRequestId here
 			}
 
 			// now add to apiconversationhistory

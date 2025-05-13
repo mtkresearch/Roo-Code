@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk"
+import { resolvePromptRequest } from "../../integrations/httpInput/simpleHttpServer"
 
 import { Cline } from "../Cline"
 import {
@@ -64,6 +65,15 @@ export async function attemptCompletionTool(
 			}
 
 			cline.consecutiveMistakeCount = 0
+
+			if (cline._httpRequestId) {
+				// 使用已累積的數據 cline._httpAccumulatedResponse 作為最終發送內容。
+				const httpResponseData = cline._httpAccumulatedResponse
+
+				resolvePromptRequest(cline._httpRequestId, true, httpResponseData, true) // isFinalResponse = true
+				cline._httpRequestId = undefined
+				cline._httpAccumulatedResponse = ""
+			}
 
 			let commandResult: ToolResponse | undefined
 
@@ -149,6 +159,17 @@ export async function attemptCompletionTool(
 		}
 	} catch (error) {
 		await handleError("inspecting site", error)
+		if (cline._httpRequestId) {
+			const errorDetails = error instanceof Error ? error.message : String(error)
+			resolvePromptRequest(
+				cline._httpRequestId,
+				false,
+				{ error: "Error in attemptCompletionTool", details: errorDetails },
+				true,
+			)
+			cline._httpRequestId = undefined
+			cline._httpAccumulatedResponse = ""
+		}
 		return
 	}
 }
