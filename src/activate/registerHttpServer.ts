@@ -3,11 +3,11 @@ import { startServer, stopServer } from "../integrations/httpInput/simpleHttpSer
 
 export function registerHttpServer(context: vscode.ExtensionContext) {
 	// 啟動 HTTP 伺服器
-	const server = startServer(30005)
+	const server = startServer(30006)
 
 	if (server) {
 		server.on("listening", () => {
-			console.log("HTTP server started successfully on port 30005")
+			console.log("HTTP server started successfully on port 30006")
 		})
 		server.on("error", (err: Error) => {
 			// 為 err 加上型別

@@ -106,7 +106,7 @@ app.post("/prompt", async (req: Request, res: Response) => {
 })
 
 // 修改 startServer 返回 http.Server
-export function startServer(port: number = 30005): http.Server {
+export function startServer(port: number = 30006): http.Server {
 	if (serverInstance) {
 		console.warn("Server is already running.")
 		return serverInstance // 直接返回現有實例
